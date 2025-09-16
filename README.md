@@ -1,20 +1,20 @@
-# Lines of Code Counter
+# 📊 Lines of Code Counter
 
-## Overview
+## 📝 Overview
 
-This repository contains a GitHub Actions workflow designed to provide insights into your project's development by tracking changes in your codebase. On every `push` to your repository, this workflow automatically calculates and reports the number of meaningful lines of code that have been added or removed.
+This repository contains a GitHub Actions workflow designed to provide insights into your project's development by tracking changes in your codebase. On every `push` to your repository, this workflow analyzes your commits to count the number of lines added and removed.
 
 The analysis focuses on key web development file types and excludes comments and other trivial changes to provide an accurate measure of your project's evolution.
 
-## Features
+## ✨ Features
 
-- **Automated Analysis**: The workflow runs automatically on every push, so you always have up-to-date information.
-- **Meaningful Metrics**: It intelligently ignores comments and trivial changes, focusing only on the code that matters.
-- **Detailed Reporting**: Provides a clear summary of added and removed lines for supported file types.
-- **Project Size Tracking**: In addition to line changes, it also reports the overall size of the project.
-- **Seamless Integration**: All reports are available directly in the GitHub Actions job summary, so you don't have to leave GitHub to see the results.
+- **🤖 Automated Analysis**: The workflow runs automatically on every push, so you always have up-to-date information.
+- **💡 Meaningful Metrics**: It intelligently ignores comments and trivial changes, focusing only on the code that matters.
+- **📈 Detailed Reporting**: Provides a clear summary of added and removed lines for supported file types.
+- **📁 Project Size Tracking**: In addition to line changes, it also reports the overall size of the project.
+- ** seamlessly Integration**: All reports are available directly in the GitHub Actions job summary, so you don't have to leave GitHub to see the results.
 
-## Supported File Types
+## 🗃️ Supported File Types
 
 The workflow currently analyzes the following file types:
 
@@ -23,16 +23,22 @@ The workflow currently analyzes the following file types:
 - `.html` (HTML)
 - `.css` (CSS)
 
-## How to Use
+## 🚀 How to Use
 
 1.  **Install the Workflow**: To use this in your own repository, copy the workflow file from `.github/workflows/` into your project's `.github/workflows/` directory.
 2.  **Push a Change**: Make a commit and push it to your repository.
 3.  **View the Report**: Navigate to the **Actions** tab in your repository. Click on the latest workflow run, and you will find the lines of code report in the job summary.
 
-## Contributing
+## 🤝 Contributing
 
 Contributions are welcome! If you have ideas for improvements or have found a bug, please feel free to open an issue or submit a pull request.
 
-## License
+## 📜 License
 
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for more details.
+
+---
+
+### ⚠️ Disclaimer
+
+This project is intended as a Proof of Concept (POC) to demonstrate an approach for counting lines of code. While it is functional, it is not a complete solution and may not handle all edge cases. It has not been fully tested and should be considered a starting point for building a more robust line-counting tool.
