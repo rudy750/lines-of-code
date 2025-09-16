@@ -1,0 +1,357 @@
+name: Count Lines of Code Changed
+
+on:
+  push:
+    branches:
+      - '**'
+
+jobs:
+  count-lines:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2  # Fetch at least 2 commits to compare with parent
+
+      - name: Count lines of code changed
+        run: |
+          echo "📊 Lines of Code Change Report"
+          echo "=============================="
+          echo ""
+          
+          # Initialize job summary
+          echo "# 📊 Lines of Code Change Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Get commit information
+          COMMIT_SHA=$(git rev-parse HEAD)
+          COMMIT_AUTHOR=$(git log --format="%an <%ae>" -1 HEAD)
+          COMMIT_MESSAGE=$(git log --format="%s" -1 HEAD)
+          COMMIT_DATE=$(git log --format="%ci" -1 HEAD)
+          
+          echo "🔍 Commit Details:"
+          echo "   SHA: $COMMIT_SHA"
+          echo "   Author: $COMMIT_AUTHOR" 
+          echo "   Message: $COMMIT_MESSAGE"
+          echo "   Date: $COMMIT_DATE"
+          echo ""
+          
+          # Add to job summary
+          echo "## 🔍 Commit Details" >> $GITHUB_STEP_SUMMARY
+          echo "- **SHA:** \`$COMMIT_SHA\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Author:** $COMMIT_AUTHOR" >> $GITHUB_STEP_SUMMARY
+          echo "- **Message:** $COMMIT_MESSAGE" >> $GITHUB_STEP_SUMMARY
+          echo "- **Date:** $COMMIT_DATE" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Check if this is the first commit or if parent exists
+          if git rev-parse HEAD~1 >/dev/null 2>&1; then
+            echo "📈 Files Changed in This Push:"
+            echo ""
+            
+            # Add to job summary
+            echo "## 📈 Files Changed in This Push" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            
+            # Function to determine if a line is a comment based on file extension
+            is_comment_line() {
+              local line="$1"
+              local file="$2"
+              
+              # Remove leading/trailing whitespace
+              line=$(echo "$line" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+              
+              case "$file" in
+                *.js|*.css)
+                  # JavaScript/CSS comments: //, /* */
+                  [[ "$line" =~ ^// ]] || [[ "$line" =~ ^/\* ]] || [[ "$line" =~ ^\*/ ]] || [[ "$line" =~ ^\* ]]
+                  ;;
+                *.html)
+                  # HTML comments: <!-- -->
+                  [[ "$line" =~ ^\<!--[[:space:]]* ]] || [[ "$line" =~ ^--\>[[:space:]]* ]]
+                  ;;
+                *.json)
+                  # JSON technically doesn't support comments, but sometimes // is used
+                  [[ "$line" =~ ^// ]]
+                  ;;
+                *)
+                  false
+                  ;;
+              esac
+            }
+            
+            # Function to count meaningful lines for a file
+            count_meaningful_lines() {
+              local file="$1"
+              local added=0
+              local removed=0
+              
+              # Get the diff for this specific file and process line by line
+              while IFS= read -r line; do
+                if [[ "$line" =~ ^(\+)(.*)$ ]]; then
+                  # Added line
+                  content="${BASH_REMATCH[2]}"
+                  # Skip if line has less than 2 non-whitespace characters
+                  if [[ $(echo "$content" | sed 's/[[:space:]]//g' | wc -c) -ge 3 ]]; then
+                    # Skip if it's a comment line
+                    if ! is_comment_line "$content" "$file"; then
+                      ((added++))
+                    fi
+                  fi
+                elif [[ "$line" =~ ^(\-)(.*)$ ]]; then
+                  # Removed line
+                  content="${BASH_REMATCH[2]}"
+                  # Skip if line has less than 2 non-whitespace characters
+                  if [[ $(echo "$content" | sed 's/[[:space:]]//g' | wc -c) -ge 3 ]]; then
+                    # Skip if it's a comment line
+                    if ! is_comment_line "$content" "$file"; then
+                      ((removed++))
+                    fi
+                  fi
+                fi
+              done < <(git diff HEAD~1 HEAD -- "$file")
+              echo "$added $removed"
+            }
+            
+            # Get all changed files with their line changes
+            git diff --numstat HEAD~1 HEAD > /tmp/all_changes.txt
+            
+            # Initialize files for tracking changes
+            > /tmp/source_changes.txt
+            
+            if [ -s /tmp/all_changes.txt ]; then
+              # Process source code files with filtering
+              while read -r added removed file; do
+                if [[ "$file" =~ \.(js|json|html|css)$ ]]; then
+                  # Apply filtering for source code files
+                  filtered_counts=$(count_meaningful_lines "$file")
+                  filtered_added=$(echo "$filtered_counts" | cut -d' ' -f1)
+                  filtered_removed=$(echo "$filtered_counts" | cut -d' ' -f2)
+                  echo "$filtered_added $filtered_removed $file" >> /tmp/source_changes.txt
+                fi
+              done < /tmp/all_changes.txt
+              
+              # Add non-source files to all_changes.txt for overall totals
+              > /tmp/combined_changes.txt
+              while read -r added removed file; do
+                if [[ ! "$file" =~ \.(js|json|html|css)$ ]]; then
+                  echo "$added $removed $file" >> /tmp/combined_changes.txt
+                fi
+              done < /tmp/all_changes.txt
+              
+              # Add source changes (filtered) to combined changes
+              if [ -s /tmp/source_changes.txt ]; then
+                cat /tmp/source_changes.txt >> /tmp/combined_changes.txt
+              fi
+              
+              if [ -s /tmp/source_changes.txt ]; then
+                echo "Source code files modified (filtered - 2+ meaningful chars, no comments):"
+                echo "   Added  Removed  File"
+                echo "   -----  -------  ----"
+                
+                # Add to job summary
+                echo "### Source code files modified (filtered - 2+ meaningful chars, no comments):" >> $GITHUB_STEP_SUMMARY
+                echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+                echo "Added  Removed  File" >> $GITHUB_STEP_SUMMARY
+                echo "-----  -------  ----" >> $GITHUB_STEP_SUMMARY
+                
+                while read -r added removed file; do
+                  printf "   %5s  %7s  %s\n" "$added" "$removed" "$file"
+                  printf "%5s  %7s  %s\n" "$added" "$removed" "$file" >> $GITHUB_STEP_SUMMARY
+                done < /tmp/source_changes.txt
+                echo ""
+                echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+                echo "" >> $GITHUB_STEP_SUMMARY
+                
+                # Calculate totals for source files
+                SOURCE_ADDED=$(awk '{sum += $1} END {print sum+0}' /tmp/source_changes.txt)
+                SOURCE_REMOVED=$(awk '{sum += $2} END {print sum+0}' /tmp/source_changes.txt)
+                SOURCE_NET=$((SOURCE_ADDED - SOURCE_REMOVED))
+                SOURCE_FILES=$(wc -l < /tmp/source_changes.txt)
+                
+                echo "📊 Source Code Summary (Filtered):"
+                echo "   Meaningful lines added: $SOURCE_ADDED"
+                echo "   Meaningful lines removed: $SOURCE_REMOVED"
+                echo "   Net change: $SOURCE_NET"
+                echo "   Files modified: $SOURCE_FILES"
+                echo ""
+                
+                # Add to job summary
+                echo "### 📊 Source Code Summary (Filtered)" >> $GITHUB_STEP_SUMMARY
+                echo "- **Meaningful lines added:** $SOURCE_ADDED" >> $GITHUB_STEP_SUMMARY
+                echo "- **Meaningful lines removed:** $SOURCE_REMOVED" >> $GITHUB_STEP_SUMMARY
+                echo "- **Net change:** $SOURCE_NET" >> $GITHUB_STEP_SUMMARY
+                echo "- **Files modified:** $SOURCE_FILES" >> $GITHUB_STEP_SUMMARY
+                echo "" >> $GITHUB_STEP_SUMMARY
+              else
+                echo "   No source code files (.js, .json, .html, .css) were modified in this push."
+                echo ""
+                
+                # Add to job summary
+                echo "### Source code files" >> $GITHUB_STEP_SUMMARY
+                echo "No source code files (.js, .json, .html, .css) were modified in this push." >> $GITHUB_STEP_SUMMARY
+                echo "" >> $GITHUB_STEP_SUMMARY
+              fi
+              
+              # Show all file changes (including non-source)
+              echo "📁 All Files Changed:"
+              echo "   Added  Removed  File"
+              echo "   -----  -------  ----"
+              
+              # Add to job summary
+              echo "### 📁 All Files Changed" >> $GITHUB_STEP_SUMMARY
+              echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+              echo "Added  Removed  File" >> $GITHUB_STEP_SUMMARY
+              echo "-----  -------  ----" >> $GITHUB_STEP_SUMMARY
+              
+              # Show filtered source files and unfiltered non-source files
+              while read -r added removed file; do
+                printf "   %5s  %7s  %s\n" "$added" "$removed" "$file"
+                printf "%5s  %7s  %s\n" "$added" "$removed" "$file" >> $GITHUB_STEP_SUMMARY
+              done < /tmp/combined_changes.txt
+              echo ""
+              echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              
+              # Calculate totals for all files
+              TOTAL_ADDED=$(awk '{sum += $1} END {print sum+0}' /tmp/combined_changes.txt)
+              TOTAL_REMOVED=$(awk '{sum += $2} END {print sum+0}' /tmp/combined_changes.txt)
+              TOTAL_NET=$((TOTAL_ADDED - TOTAL_REMOVED))
+              TOTAL_FILES=$(wc -l < /tmp/combined_changes.txt)
+              
+              echo "📊 Overall Change Summary:"
+              echo "   Total lines added: $TOTAL_ADDED (source files filtered for meaningful changes)"
+              echo "   Total lines removed: $TOTAL_REMOVED (source files filtered for meaningful changes)"
+              echo "   Net change: $TOTAL_NET"
+              echo "   Total files modified: $TOTAL_FILES"
+              echo ""
+              
+              # Add to job summary
+              echo "### 📊 Overall Change Summary" >> $GITHUB_STEP_SUMMARY
+              echo "- **Total lines added:** $TOTAL_ADDED (source files filtered for meaningful changes)" >> $GITHUB_STEP_SUMMARY
+              echo "- **Total lines removed:** $TOTAL_REMOVED (source files filtered for meaningful changes)" >> $GITHUB_STEP_SUMMARY
+              echo "- **Net change:** $TOTAL_NET" >> $GITHUB_STEP_SUMMARY
+              echo "- **Total files modified:** $TOTAL_FILES" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              
+            else
+              echo "   No files were changed in this push."
+              echo ""
+              
+              # Add to job summary
+              echo "No files were changed in this push." >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+            fi
+            
+            # Calculate new total project lines for source code
+            echo "📏 Current Project Size:"
+            
+            # Add to job summary
+            echo "### 📏 Current Project Size" >> $GITHUB_STEP_SUMMARY
+            FIND_EXCLUDES=""
+            FIND_EXCLUDES="$FIND_EXCLUDES ! -path \"./.git/*\" ! -path \"./.*\" ! -name \".*\""
+            
+            # Add .gitignore patterns if the file exists
+            if [ -f ".gitignore" ]; then
+              while IFS= read -r line || [ -n "$line" ]; do
+                if [ -n "$line" ] && [ "${line#\#}" = "$line" ]; then
+                  pattern=$(echo "$line" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+                  if [ -n "$pattern" ]; then
+                    if [ "${pattern%/}" != "$pattern" ]; then
+                      dir_pattern="${pattern%/}"
+                      FIND_EXCLUDES="$FIND_EXCLUDES ! -path \"./$dir_pattern/*\""
+                    elif [ "${pattern#\*.}" != "$pattern" ] && [ "${pattern#\*.}" != "" ]; then
+                      FIND_EXCLUDES="$FIND_EXCLUDES ! -name \"$pattern\""
+                    else
+                      FIND_EXCLUDES="$FIND_EXCLUDES ! -path \"./$pattern/*\" ! -name \"$pattern\""
+                    fi
+                  fi
+                fi
+              done < .gitignore
+            fi
+            
+            FIND_EXCLUDES="$FIND_EXCLUDES ! -name \"package-lock.json\" ! -name \"*.md\" ! -name \"*.yml\" ! -name \"*.yaml\""
+            FIND_CMD="find . -type f $FIND_EXCLUDES \\( -name \"*.js\" -o -name \"*.json\" -o -name \"*.html\" -o -name \"*.css\" \\)"
+            
+            CURRENT_TOTAL=$(eval "$FIND_CMD -exec cat {} + | wc -l")
+            echo "   Total source code lines in project: $CURRENT_TOTAL"
+            
+            # Add to job summary
+            echo "- **Total source code lines in project:** $CURRENT_TOTAL" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            
+          else
+            echo "⚠️  This appears to be the first commit in the repository."
+            echo "   Cannot compare with previous commit to show changes."
+            echo ""
+            
+            # Add to job summary
+            echo "## ⚠️ First Commit" >> $GITHUB_STEP_SUMMARY
+            echo "This appears to be the first commit in the repository." >> $GITHUB_STEP_SUMMARY
+            echo "Cannot compare with previous commit to show changes." >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            
+            # For first commit, show what was added
+            echo "📁 All Files in Initial Commit:"
+            
+            # Add to job summary
+            echo "### 📁 All Files in Initial Commit" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            
+            git ls-tree -r --name-only HEAD | while read -r file; do
+              if [[ "$file" =~ \.(js|json|html|css)$ ]]; then
+                lines=$(wc -l < "$file" 2>/dev/null || echo "0")
+                printf "   %5s  %7s  %s (source)\n" "$lines" "0" "$file"
+                printf "%5s  %7s  %s (source)\n" "$lines" "0" "$file" >> $GITHUB_STEP_SUMMARY
+              else
+                lines=$(wc -l < "$file" 2>/dev/null || echo "0")
+                printf "   %5s  %7s  %s\n" "$lines" "0" "$file"
+                printf "%5s  %7s  %s\n" "$lines" "0" "$file" >> $GITHUB_STEP_SUMMARY
+              fi
+            done
+            echo ""
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            
+            # Calculate initial totals
+            FIND_EXCLUDES=""
+            FIND_EXCLUDES="$FIND_EXCLUDES ! -path \"./.git/*\" ! -path \"./.*\" ! -name \".*\""
+            
+            if [ -f ".gitignore" ]; then
+              while IFS= read -r line || [ -n "$line" ]; do
+                if [ -n "$line" ] && [ "${line#\#}" = "$line" ]; then
+                  pattern=$(echo "$line" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+                  if [ -n "$pattern" ]; then
+                    if [ "${pattern%/}" != "$pattern" ]; then
+                      dir_pattern="${pattern%/}"
+                      FIND_EXCLUDES="$FIND_EXCLUDES ! -path \"./$dir_pattern/*\""
+                    elif [ "${pattern#\*.}" != "$pattern" ] && [ "${pattern#\*.}" != "" ]; then
+                      FIND_EXCLUDES="$FIND_EXCLUDES ! -name \"$pattern\""
+                    else
+                      FIND_EXCLUDES="$FIND_EXCLUDES ! -path \"./$pattern/*\" ! -name \"$pattern\""
+                    fi
+                  fi
+                fi
+              done < .gitignore
+            fi
+            
+            FIND_EXCLUDES="$FIND_EXCLUDES ! -name \"package-lock.json\" ! -name \"*.md\" ! -name \"*.yml\" ! -name \"*.yaml\""
+            FIND_CMD="find . -type f $FIND_EXCLUDES \\( -name \"*.js\" -o -name \"*.json\" -o -name \"*.html\" -o -name \"*.css\" \\)"
+            
+            INITIAL_TOTAL=$(eval "$FIND_CMD -exec cat {} + | wc -l")
+            echo "📊 Initial Repository Summary:"
+            echo "   Total source code lines added: $INITIAL_TOTAL"
+            echo ""
+            
+            # Add to job summary
+            echo "### 📊 Initial Repository Summary" >> $GITHUB_STEP_SUMMARY
+            echo "- **Total source code lines added:** $INITIAL_TOTAL" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "✅ Lines of Code Change Report Complete"
+          
+          # Add to job summary
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "✅ **Lines of Code Change Report Complete**" >> $GITHUB_STEP_SUMMARY
