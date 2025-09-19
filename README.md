@@ -4,7 +4,7 @@
 
 This repository contains a GitHub Actions workflow designed to provide insights into your project's development by tracking changes in your codebase. On every `push` to your repository, this workflow analyzes your commits to count the number of lines added and removed.
 
-The analysis focuses on key web development file types and excludes comments and other trivial changes to provide an accurate measure of your project's evolution.
+The analysis focuses on popular programming languages across web development, backend systems, mobile development, and scripting, and excludes comments and other trivial changes to provide an accurate measure of your project's evolution.
 
 ## ✨ Features
 
@@ -18,10 +18,34 @@ The analysis focuses on key web development file types and excludes comments and
 
 The workflow currently analyzes the following file types:
 
+### Web Development
 - `.js` (JavaScript)
+- `.ts` (TypeScript)
+- `.tsx` (TypeScript JSX)
 - `.json` (JSON)
 - `.html` (HTML)
 - `.css` (CSS)
+
+### Backend & Systems Programming
+- `.py` (Python)
+- `.java` (Java)
+- `.cs` (C#)
+- `.cpp`, `.cc`, `.cxx` (C++)
+- `.c` (C)
+- `.h`, `.hpp` (C/C++ Headers)
+- `.go` (Go)
+- `.rs` (Rust)
+- `.php` (PHP)
+
+### Mobile & Other Languages
+- `.rb` (Ruby)
+- `.swift` (Swift)
+- `.kt`, `.kts` (Kotlin)
+- `.scala` (Scala)
+
+### Scripting
+- `.sh` (Shell)
+- `.bash` (Bash)
 
 ## 🚀 How to Use
 
