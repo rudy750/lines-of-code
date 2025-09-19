@@ -63,8 +63,24 @@ jobs:
               line=$(echo "$line" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
               
               case "$file" in
-                *.js|*.css)
-                  # JavaScript/CSS comments: //, /* */
+                *.js|*.ts|*.tsx|*.css|*.java|*.cs|*.cpp|*.cc|*.cxx|*.c|*.go|*.rs|*.php|*.kt|*.kts|*.scala)
+                  # C-style comments: //, /* */
+                  [[ "$line" =~ ^// ]] || [[ "$line" =~ ^/\* ]] || [[ "$line" =~ ^\*/ ]] || [[ "$line" =~ ^\* ]]
+                  ;;
+                *.py|*.sh|*.bash)
+                  # Python/Shell comments: #
+                  [[ "$line" =~ ^# ]]
+                  ;;
+                *.rb)
+                  # Ruby comments: # and =begin/=end blocks
+                  [[ "$line" =~ ^# ]] || [[ "$line" =~ ^=begin ]] || [[ "$line" =~ ^=end ]]
+                  ;;
+                *.swift)
+                  # Swift comments: //, /* */, ///
+                  [[ "$line" =~ ^// ]] || [[ "$line" =~ ^/// ]] || [[ "$line" =~ ^/\* ]] || [[ "$line" =~ ^\*/ ]] || [[ "$line" =~ ^\* ]]
+                  ;;
+                *.h|*.hpp)
+                  # C/C++ header comments: //, /* */
                   [[ "$line" =~ ^// ]] || [[ "$line" =~ ^/\* ]] || [[ "$line" =~ ^\*/ ]] || [[ "$line" =~ ^\* ]]
                   ;;
                 *.html)
@@ -123,7 +139,7 @@ jobs:
             if [ -s /tmp/all_changes.txt ]; then
               # Process source code files with filtering
               while read -r added removed file; do
-                if [[ "$file" =~ \.(js|json|html|css)$ ]]; then
+                if [[ "$file" =~ \.(js|ts|tsx|json|html|css|py|java|cs|cpp|cc|cxx|c|h|hpp|go|rs|php|rb|swift|kt|kts|scala|sh|bash)$ ]]; then
                   # Apply filtering for source code files
                   filtered_counts=$(count_meaningful_lines "$file")
                   filtered_added=$(echo "$filtered_counts" | cut -d' ' -f1)
@@ -135,7 +151,7 @@ jobs:
               # Add non-source files to all_changes.txt for overall totals
               > /tmp/combined_changes.txt
               while read -r added removed file; do
-                if [[ ! "$file" =~ \.(js|json|html|css)$ ]]; then
+                if [[ ! "$file" =~ \.(js|ts|tsx|json|html|css|py|java|cs|cpp|cc|cxx|c|h|hpp|go|rs|php|rb|swift|kt|kts|scala|sh|bash)$ ]]; then
                   echo "$added $removed $file" >> /tmp/combined_changes.txt
                 fi
               done < /tmp/all_changes.txt
@@ -185,12 +201,12 @@ jobs:
                 echo "- **Files modified:** $SOURCE_FILES" >> $GITHUB_STEP_SUMMARY
                 echo "" >> $GITHUB_STEP_SUMMARY
               else
-                echo "   No source code files (.js, .json, .html, .css) were modified in this push."
+                echo "   No source code files were modified in this push."
                 echo ""
                 
                 # Add to job summary
                 echo "### Source code files" >> $GITHUB_STEP_SUMMARY
-                echo "No source code files (.js, .json, .html, .css) were modified in this push." >> $GITHUB_STEP_SUMMARY
+                echo "No source code files were modified in this push." >> $GITHUB_STEP_SUMMARY
                 echo "" >> $GITHUB_STEP_SUMMARY
               fi
               
@@ -272,7 +288,7 @@ jobs:
             fi
             
             FIND_EXCLUDES="$FIND_EXCLUDES ! -name \"package-lock.json\" ! -name \"*.md\" ! -name \"*.yml\" ! -name \"*.yaml\""
-            FIND_CMD="find . -type f $FIND_EXCLUDES \\( -name \"*.js\" -o -name \"*.json\" -o -name \"*.html\" -o -name \"*.css\" \\)"
+            FIND_CMD="find . -type f $FIND_EXCLUDES \\( -name \"*.js\" -o -name \"*.ts\" -o -name \"*.tsx\" -o -name \"*.json\" -o -name \"*.html\" -o -name \"*.css\" -o -name \"*.py\" -o -name \"*.java\" -o -name \"*.cs\" -o -name \"*.cpp\" -o -name \"*.cc\" -o -name \"*.cxx\" -o -name \"*.c\" -o -name \"*.h\" -o -name \"*.hpp\" -o -name \"*.go\" -o -name \"*.rs\" -o -name \"*.php\" -o -name \"*.rb\" -o -name \"*.swift\" -o -name \"*.kt\" -o -name \"*.kts\" -o -name \"*.scala\" -o -name \"*.sh\" -o -name \"*.bash\" \\)"
             
             CURRENT_TOTAL=$(eval "$FIND_CMD -exec cat {} + | wc -l")
             echo "   Total source code lines in project: $CURRENT_TOTAL"
@@ -300,7 +316,7 @@ jobs:
             echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
             
             git ls-tree -r --name-only HEAD | while read -r file; do
-              if [[ "$file" =~ \.(js|json|html|css)$ ]]; then
+              if [[ "$file" =~ \.(js|ts|tsx|json|html|css|py|java|cs|cpp|cc|cxx|c|h|hpp|go|rs|php|rb|swift|kt|kts|scala|sh|bash)$ ]]; then
                 lines=$(wc -l < "$file" 2>/dev/null || echo "0")
                 printf "   %5s  %7s  %s (source)\n" "$lines" "0" "$file"
                 printf "%5s  %7s  %s (source)\n" "$lines" "0" "$file" >> $GITHUB_STEP_SUMMARY
@@ -337,7 +353,7 @@ jobs:
             fi
             
             FIND_EXCLUDES="$FIND_EXCLUDES ! -name \"package-lock.json\" ! -name \"*.md\" ! -name \"*.yml\" ! -name \"*.yaml\""
-            FIND_CMD="find . -type f $FIND_EXCLUDES \\( -name \"*.js\" -o -name \"*.json\" -o -name \"*.html\" -o -name \"*.css\" \\)"
+            FIND_CMD="find . -type f $FIND_EXCLUDES \\( -name \"*.js\" -o -name \"*.ts\" -o -name \"*.tsx\" -o -name \"*.json\" -o -name \"*.html\" -o -name \"*.css\" -o -name \"*.py\" -o -name \"*.java\" -o -name \"*.cs\" -o -name \"*.cpp\" -o -name \"*.cc\" -o -name \"*.cxx\" -o -name \"*.c\" -o -name \"*.h\" -o -name \"*.hpp\" -o -name \"*.go\" -o -name \"*.rs\" -o -name \"*.php\" -o -name \"*.rb\" -o -name \"*.swift\" -o -name \"*.kt\" -o -name \"*.kts\" -o -name \"*.scala\" -o -name \"*.sh\" -o -name \"*.bash\" \\)"
             
             INITIAL_TOTAL=$(eval "$FIND_CMD -exec cat {} + | wc -l")
             echo "📊 Initial Repository Summary:"
